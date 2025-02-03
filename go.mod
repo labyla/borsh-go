@@ -1,4 +1,4 @@
-module github.com/near/borsh-go
+module github.com/labyla/borsh-go
 
 go 1.15
 
