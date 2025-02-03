@@ -20,7 +20,7 @@ func Deserialize(s interface{}, data []byte) error {
 	if v.Kind() != reflect.Ptr {
 		return errors.New("passed struct must be pointer")
 	}
-	result, err := deserialize(reflect.TypeOf(s).Elem(), reader)
+	result, err := deserialize(reflect.TypeOf(s).Elem(), reader, "")
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func read(r io.Reader, n int) ([]byte, error) {
 	return b, nil
 }
 
-func deserialize(t reflect.Type, r io.Reader) (interface{}, error) {
+func deserialize(t reflect.Type, r io.Reader, tag reflect.StructTag) (interface{}, error) {
 	if t.Kind() == reflect.Uint8 {
 		tmp, err := read(r, 1)
 		if err != nil {
@@ -148,11 +148,22 @@ func deserialize(t reflect.Type, r io.Reader) (interface{}, error) {
 		}
 		return f, nil
 	case reflect.String:
-		tmp, err := read(r, 4)
-		if err != nil {
-			return nil, err
+		l := 0
+		switch tag.Get("borsh_str_len") {
+		case "8":
+			tmp, err := read(r, 8)
+			if err != nil {
+				return nil, err
+			}
+			l = int(binary.LittleEndian.Uint64(tmp))
+
+		default:
+			tmp, err := read(r, 4)
+			if err != nil {
+				return nil, err
+			}
+			l = int(binary.LittleEndian.Uint32(tmp))
 		}
-		l := int(binary.LittleEndian.Uint32(tmp))
 		if l == 0 {
 			return "", nil
 		}
@@ -166,7 +177,7 @@ func deserialize(t reflect.Type, r io.Reader) (interface{}, error) {
 		l := t.Len()
 		a := reflect.New(t).Elem()
 		for i := 0; i < l; i++ {
-			av, err := deserialize(t.Elem(), r)
+			av, err := deserialize(t.Elem(), r, tag)
 			if err != nil {
 				return nil, err
 			}
@@ -184,7 +195,7 @@ func deserialize(t reflect.Type, r io.Reader) (interface{}, error) {
 			return a.Interface(), nil
 		}
 		for i := 0; i < l; i++ {
-			av, err := deserialize(t.Elem(), r)
+			av, err := deserialize(t.Elem(), r, tag)
 			if err != nil {
 				return nil, err
 			}
@@ -202,11 +213,11 @@ func deserialize(t reflect.Type, r io.Reader) (interface{}, error) {
 			return m.Interface(), nil
 		}
 		for i := 0; i < l; i++ {
-			k, err := deserialize(t.Key(), r)
+			k, err := deserialize(t.Key(), r, tag)
 			if err != nil {
 				return nil, err
 			}
-			v, err := deserialize(t.Elem(), r)
+			v, err := deserialize(t.Elem(), r, tag)
 			if err != nil {
 				return nil, err
 			}
@@ -224,7 +235,7 @@ func deserialize(t reflect.Type, r io.Reader) (interface{}, error) {
 			return p.Interface(), nil
 		} else {
 			p := reflect.New(t.Elem())
-			de, err := deserialize(t.Elem(), r)
+			de, err := deserialize(t.Elem(), r, tag)
 			if err != nil {
 				return nil, err
 			}
@@ -263,7 +274,7 @@ func deserializeComplexEnum(t reflect.Type, r io.Reader) (interface{}, error) {
 	if int(enum)+1 >= t.NumField() {
 		return nil, errors.New("complex enum too large")
 	}
-	fv, err := deserialize(t.Field(int(enum)+1).Type, r)
+	fv, err := deserialize(t.Field(int(enum)+1).Type, r, "")
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +304,7 @@ func deserializeStruct(t reflect.Type, r io.Reader) (interface{}, error) {
 			continue
 		}
 
-		fv, err := deserialize(t.Field(i).Type, r)
+		fv, err := deserialize(t.Field(i).Type, r, tag)
 		if err != nil {
 			return nil, err
 		}

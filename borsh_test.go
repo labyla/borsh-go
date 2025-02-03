@@ -6,6 +6,8 @@ import (
 	"reflect"
 	strings2 "strings"
 	"testing"
+
+	"github.com/mr-tron/base58"
 )
 
 type A struct {
@@ -494,5 +496,32 @@ func TestPointer(t *testing.T) {
 	}
 	if bts[0] != 0 {
 		t.Errorf("expected pointer byte to be 0")
+	}
+}
+
+func TestString(t *testing.T) {
+	type s struct {
+		Discriminator uint32
+		Base          [32]byte
+		Seed          string `borsh_str_len:"8"`
+		Lamports      uint64
+		Space         uint64
+		Owner         [32]byte
+	}
+
+	Data, err := base58.Decode("3ipZWwsSXXSWFvaito6b2ZunyGhdQP6b34V6uABVe7opsiJvg2iWpsmBUptLykQdaHsc38CKnRDhJewZw5qhS1YLLewkW3PkSdxFgywLqcZHaEePv8mMoEvF5XJfoNbiBBSTxrzVVE5JczezvPVfZZYMMCMQbbUcHgLJqNSQX")
+	if err != nil {
+		t.Fatalf("failed to decode base58 data: %v", err)
+	}
+
+	var (
+		S = s{}
+	)
+	if err := Deserialize(&S, Data); err != nil {
+		t.Fatalf("failed to deserialize data: %v", err)
+	}
+
+	if S.Seed != "Mehzi5TbexINpkkX3ydHimGlknJjuNaI" {
+		t.Errorf("unexpected seed: %v", S.Seed)
 	}
 }
